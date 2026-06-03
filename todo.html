@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>To-Do</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #faf8f5;
+      color: #1c1917;
+      min-height: 100vh;
+      padding: 0 16px 80px;
+    }
+
+    .app {
+      max-width: 480px;
+      margin: 0 auto;
+    }
+
+    header {
+      padding: 52px 0 24px;
+    }
+
+    header h1 {
+      font-size: 26px;
+      font-weight: 700;
+      letter-spacing: -0.4px;
+    }
+
+    .progress {
+      font-size: 13px;
+      color: #a8a29e;
+      margin-top: 3px;
+    }
+
+    .input-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+
+    input[type="text"] {
+      flex: 1;
+      height: 44px;
+      border: 1.5px solid #e8e0d5;
+      border-radius: 10px;
+      padding: 0 13px;
+      font-size: 15px;
+      color: #1c1917;
+      background: #fff;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    input[type="text"]:focus {
+      border-color: #a16207;
+    }
+
+    input[type="text"]::placeholder {
+      color: #c4b89a;
+    }
+
+    .btn-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 10px;
+      border: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: opacity 0.15s, background 0.15s;
+    }
+
+    .btn-icon:active { opacity: 0.7; }
+
+    .btn-add {
+      background: #a16207;
+      color: #fff;
+    }
+
+    .btn-mic {
+      background: #fff;
+      color: #78716c;
+      border: 1.5px solid #e8e0d5;
+    }
+
+    .btn-mic.listening {
+      color: #ef4444;
+      border-color: #fca5a5;
+      background: #fff5f5;
+      animation: mic-pulse 1.2s ease-in-out infinite;
+    }
+
+    @keyframes mic-pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.06); }
+    }
+
+    .mic-hint {
+      font-size: 12px;
+      color: #ef4444;
+      height: 18px;
+      padding-left: 2px;
+      margin-bottom: 16px;
+    }
+
+    .task-list {
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+    }
+
+    .task-item {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 1px 3px rgba(0,0,0,.06);
+      display: flex;
+      align-items: center;
+      min-height: 52px;
+      position: relative;
+      overflow: hidden;
+      touch-action: pan-y;
+      user-select: none;
+    }
+
+    .task-item.editing {
+      overflow: visible;
+    }
+
+    .swipe-bg {
+      position: absolute;
+      inset: 0;
+      background: #fee2e2;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      padding-right: 18px;
+      color: #ef4444;
+      border-radius: 12px;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .task-inner {
+      display: flex;
+      align-items: center;
+      width: 100%;
+      padding: 0 10px 0 12px;
+      gap: 10px;
+      background: #fff;
+      border-radius: 12px;
+      min-height: 52px;
+      transition: transform 0.22s ease;
+      position: relative;
+      z-index: 1;
+    }
+
+    .task-check {
+      width: 20px;
+      height: 20px;
+      flex-shrink: 0;
+      cursor: pointer;
+      appearance: none;
+      -webkit-appearance: none;
+      border: 2px solid #d4c4aa;
+      border-radius: 50%;
+      transition: all 0.15s;
+      position: relative;
+    }
+
+    .task-check:checked {
+      background: #a16207;
+      border-color: #a16207;
+    }
+
+    .task-check:checked::after {
+      content: '';
+      position: absolute;
+      left: 4px;
+      top: 1px;
+      width: 6px;
+      height: 10px;
+      border: 2px solid #fff;
+      border-top: none;
+      border-left: none;
+      transform: rotate(45deg);
+    }
+
+    .task-label {
+      flex: 1;
+      font-size: 15px;
+      color: #1c1917;
+      cursor: pointer;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      transition: color 0.15s;
+      min-width: 0;
+    }
+
+    .task-item.done .task-label {
+      text-decoration: line-through;
+      color: #a8a29e;
+    }
+
+    /* inline edit input inside task */
+    .task-edit-input {
+      flex: 1;
+      height: 34px;
+      border: 1.5px solid #a16207;
+      border-radius: 7px;
+      padding: 0 9px;
+      font-size: 15px;
+      color: #1c1917;
+      background: #faf8f5;
+      outline: none;
+      min-width: 0;
+    }
+
+    /* action buttons (edit + delete) */
+    .task-actions {
+      display: flex;
+      gap: 2px;
+      flex-shrink: 0;
+    }
+
+    .btn-action {
+      width: 28px;
+      height: 28px;
+      border: none;
+      background: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      border-radius: 7px;
+      flex-shrink: 0;
+      opacity: 0;
+      transition: opacity 0.15s, color 0.15s;
+    }
+
+    .btn-action.btn-edit { color: #c4b89a; }
+    .btn-action.btn-delete { color: #c4b89a; }
+
+    .task-item:hover .btn-action,
+    .task-item.show-actions .btn-action {
+      opacity: 1;
+    }
+
+    .btn-action.btn-edit:hover { color: #a16207; }
+    .btn-action.btn-delete:hover { color: #ef4444; }
+
+    /* save/cancel buttons during editing */
+    .btn-save {
+      width: 28px;
+      height: 28px;
+      border: none;
+      background: none;
+      color: #a16207;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      border-radius: 7px;
+      flex-shrink: 0;
+      transition: color 0.15s;
+    }
+
+    .btn-save:hover { color: #78350f; }
+
+    .footer-controls {
+      margin-top: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+    }
+
+    .btn-text {
+      background: none;
+      border: none;
+      font-size: 13px;
+      color: #a8a29e;
+      cursor: pointer;
+      padding: 6px 10px;
+      border-radius: 6px;
+      transition: color 0.15s;
+    }
+
+    .btn-text:hover { color: #78716c; }
+    .btn-text.danger:hover { color: #ef4444; }
+
+    .empty-state {
+      text-align: center;
+      padding: 52px 0;
+      color: #c4b89a;
+    }
+
+    .empty-state p {
+      font-size: 14px;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <h1>To-Do</h1>
+      <p class="progress" id="progress"></p>
+    </header>
+
+    <div class="input-row">
+      <input type="text" id="taskInput" placeholder="Neue Aufgabe…" autocomplete="off" />
+      <button class="btn-icon btn-mic" id="btnMic" title="Spracheingabe" onclick="toggleMic()">
+        <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/>
+          <path d="M19 10v2a7 7 0 01-14 0v-2"/>
+          <line x1="12" y1="19" x2="12" y2="23"/>
+          <line x1="8" y1="23" x2="16" y2="23"/>
+        </svg>
+      </button>
+      <button class="btn-icon btn-add" onclick="addTask()" title="Hinzufügen">
+        <svg viewBox="0 0 24 24" width="19" height="19" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="12" y1="5" x2="12" y2="19"/>
+          <line x1="5" y1="12" x2="19" y2="12"/>
+        </svg>
+      </button>
+    </div>
+    <p class="mic-hint" id="micHint"></p>
+
+    <div class="task-list" id="taskList"></div>
+
+    <div class="footer-controls" id="footerControls" style="display:none">
+      <button class="btn-text" id="btnToggle" onclick="toggleHideCompleted()">Erledigte ausblenden</button>
+      <button class="btn-text danger" onclick="clearCompleted()">Alle erledigten löschen</button>
+    </div>
+  </div>
+
+  <script>
+    let tasks = JSON.parse(localStorage.getItem('todo_tasks') || '[]');
+    let hideCompleted = false;
+    let micRecognition = null;
+
+    const STOPWORDS = new Set([
+      'ich','du','er','sie','es','wir','ihr','mich','mir','dich','dir','ihn','ihm','uns','euch','ihnen',
+      'mein','meine','meinen','meinem','meiner','dein','deine','sein','seine','ihre','unser','euer',
+      'ein','eine','einen','einem','einer','der','die','das','den','dem','des',
+      'und','oder','aber','weil','dass','wenn','ob','damit','sodass','obwohl','während',
+      'ist','sind','war','waren','bin','bist','hat','hatte','haben','habe','wird','werden','würde',
+      'kann','könnte','soll','sollte','muss','müsste','darf','mag',
+      'in','an','auf','über','unter','vor','hinter','neben','zwischen','durch','gegen','ohne','um',
+      'für','mit','von','zu','bei','nach','seit','aus','außer','bis',
+      'zum','zur','im','ins','am','ans','vom','beim',
+      'nicht','kein','keine','keinen','keinem','keiner',
+      'noch','dann','schon','auch','so','wie','wo','was','wer','wann','warum',
+      'heute','morgen','gestern','jetzt','mal','doch','halt','eben','ja','nein','bitte',
+      'möchte','will','wollen','gerne','eigentlich','einfach','nur','also','echt','kurz'
+    ]);
+
+    function compressText(raw) {
+      const words = raw.trim().split(/\s+/);
+      const filtered = words.filter(w => !STOPWORDS.has(w.toLowerCase()) && w.length > 1);
+      const result = (filtered.length > 0 ? filtered : words).slice(0, 5);
+      return result.map((w, i) => i === 0 ? w.charAt(0).toUpperCase() + w.slice(1) : w).join(' ');
+    }
+
+    function save() {
+      localStorage.setItem('todo_tasks', JSON.stringify(tasks));
+    }
+
+    function updateProgress() {
+      const total = tasks.length;
+      const done = tasks.filter(t => t.done).length;
+      const el = document.getElementById('progress');
+      if (total === 0) { el.textContent = ''; return; }
+      if (done === 0) el.textContent = `${total} Aufgabe${total !== 1 ? 'n' : ''}`;
+      else el.textContent = `${done} von ${total} erledigt`;
+    }
+
+    function render() {
+      const list = document.getElementById('taskList');
+      const footer = document.getElementById('footerControls');
+      const btnToggle = document.getElementById('btnToggle');
+      const hasDone = tasks.some(t => t.done);
+
+      list.innerHTML = '';
+
+      const visible = hideCompleted ? tasks.filter(t => !t.done) : tasks;
+
+      if (visible.length === 0) {
+        const e = document.createElement('div');
+        e.className = 'empty-state';
+        e.innerHTML = `
+          <svg viewBox="0 0 24 24" width="36" height="36" stroke="#e8e0d5" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="18" height="18" rx="3"/>
+            <path d="M9 12l2 2 4-4"/>
+          </svg>
+          <p>${tasks.length === 0 ? 'Noch keine Aufgaben' : 'Alle erledigt ✓'}</p>`;
+        list.appendChild(e);
+      } else {
+        visible.forEach(task => list.appendChild(buildItem(task)));
+      }
+
+      footer.style.display = hasDone ? 'flex' : 'none';
+      btnToggle.textContent = hideCompleted ? 'Erledigte einblenden' : 'Erledigte ausblenden';
+      updateProgress();
+    }
+
+    function buildItem(task) {
+      const item = document.createElement('div');
+      item.className = 'task-item' + (task.done ? ' done' : '');
+      item.dataset.id = task.id;
+
+      item.innerHTML = `
+        <div class="swipe-bg">
+          <svg viewBox="0 0 24 24" width="19" height="19" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="3 6 5 6 21 6"/>
+            <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/>
+            <path d="M10 11v6M14 11v6"/>
+            <path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/>
+          </svg>
+        </div>
+        <div class="task-inner">
+          <input type="checkbox" class="task-check" ${task.done ? 'checked' : ''}/>
+          <span class="task-label">${escHtml(task.text)}</span>
+          <div class="task-actions">
+            <button class="btn-action btn-edit" title="Bearbeiten">
+              <svg viewBox="0 0 24 24" width="15" height="15" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
+                <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+              </svg>
+            </button>
+            <button class="btn-action btn-delete" title="Löschen">
+              <svg viewBox="0 0 24 24" width="15" height="15" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="3 6 5 6 21 6"/>
+                <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/>
+                <path d="M10 11v6M14 11v6"/>
+                <path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/>
+              </svg>
+            </button>
+          </div>
+        </div>`;
+
+      item.querySelector('.task-check').addEventListener('change', () => toggle(task.id));
+      item.querySelector('.task-label').addEventListener('click', () => toggle(task.id));
+      item.querySelector('.btn-edit').addEventListener('click', e => { e.stopPropagation(); startEdit(item, task); });
+      item.querySelector('.btn-delete').addEventListener('click', () => remove(task.id));
+
+      addSwipe(item, task.id);
+
+      let tapTimer = null;
+      item.addEventListener('touchstart', () => {
+        tapTimer = setTimeout(() => item.classList.add('show-actions'), 400);
+      }, { passive: true });
+      item.addEventListener('touchend', () => clearTimeout(tapTimer), { passive: true });
+
+      return item;
+    }
+
+    function startEdit(item, task) {
+      item.classList.add('editing');
+      const inner = item.querySelector('.task-inner');
+      const label = item.querySelector('.task-label');
+      const actions = item.querySelector('.task-actions');
+
+      const editInput = document.createElement('input');
+      editInput.type = 'text';
+      editInput.className = 'task-edit-input';
+      editInput.value = task.text;
+
+      const saveBtn = document.createElement('button');
+      saveBtn.className = 'btn-save';
+      saveBtn.title = 'Speichern';
+      saveBtn.innerHTML = `<svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
+
+      label.replaceWith(editInput);
+      actions.replaceWith(saveBtn);
+
+      editInput.focus();
+      editInput.select();
+
+      function commit() {
+        const val = editInput.value.trim();
+        if (val) { task.text = val; save(); }
+        render();
+      }
+
+      function cancel() { render(); }
+
+      saveBtn.addEventListener('click', commit);
+      editInput.addEventListener('keydown', e => {
+        if (e.key === 'Enter') commit();
+        if (e.key === 'Escape') cancel();
+      });
+      editInput.addEventListener('blur', () => {
+        setTimeout(() => {
+          if (document.activeElement !== saveBtn) commit();
+        }, 100);
+      });
+    }
+
+    function escHtml(t) {
+      return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    function addTask() {
+      const input = document.getElementById('taskInput');
+      const text = input.value.trim();
+      if (!text) return;
+      tasks.unshift({ id: Date.now(), text, done: false });
+      save();
+      render();
+      input.value = '';
+      input.focus();
+    }
+
+    function toggle(id) {
+      const t = tasks.find(t => t.id === id);
+      if (t) { t.done = !t.done; save(); render(); }
+    }
+
+    function remove(id) {
+      tasks = tasks.filter(t => t.id !== id);
+      save();
+      render();
+    }
+
+    function toggleHideCompleted() {
+      hideCompleted = !hideCompleted;
+      render();
+    }
+
+    function clearCompleted() {
+      tasks = tasks.filter(t => !t.done);
+      save();
+      render();
+    }
+
+    function addSwipe(item, id) {
+      let startX = 0, curX = 0, active = false;
+      const inner = item.querySelector('.task-inner');
+      const bg = item.querySelector('.swipe-bg');
+
+      item.addEventListener('touchstart', e => {
+        startX = e.touches[0].clientX;
+        active = true;
+        inner.style.transition = 'none';
+      }, { passive: true });
+
+      item.addEventListener('touchmove', e => {
+        if (!active) return;
+        curX = Math.min(0, e.touches[0].clientX - startX);
+        const offset = Math.max(curX, -72);
+        inner.style.transform = `translateX(${offset}px)`;
+        bg.style.opacity = Math.min(-offset / 72, 1);
+      }, { passive: true });
+
+      item.addEventListener('touchend', () => {
+        active = false;
+        inner.style.transition = 'transform 0.22s ease';
+        if (curX < -55) {
+          inner.style.transform = 'translateX(-110%)';
+          setTimeout(() => remove(id), 200);
+        } else {
+          inner.style.transform = 'translateX(0)';
+          bg.style.opacity = '0';
+        }
+        curX = 0;
+      });
+    }
+
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    function toggleMic() {
+      if (!SR) { alert('Spracherkennung wird von diesem Browser nicht unterstützt.'); return; }
+      const btn = document.getElementById('btnMic');
+      const hint = document.getElementById('micHint');
+
+      if (micRecognition) { micRecognition.stop(); return; }
+
+      micRecognition = new SR();
+      micRecognition.lang = 'de-DE';
+      micRecognition.interimResults = false;
+      micRecognition.maxAlternatives = 1;
+
+      btn.classList.add('listening');
+      hint.textContent = 'Sprechen…';
+
+      micRecognition.onresult = e => {
+        const raw = e.results[0][0].transcript;
+        document.getElementById('taskInput').value = compressText(raw);
+        document.getElementById('taskInput').focus();
+      };
+
+      micRecognition.onend = () => {
+        micRecognition = null;
+        btn.classList.remove('listening');
+        hint.textContent = '';
+      };
+
+      micRecognition.onerror = () => {
+        micRecognition = null;
+        btn.classList.remove('listening');
+        hint.textContent = '';
+      };
+
+      micRecognition.start();
+    }
+
+    document.getElementById('taskInput').addEventListener('keydown', e => {
+      if (e.key === 'Enter') addTask();
+    });
+
+    render();
+  </script>
+</body>
+</html>
